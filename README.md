@@ -1,69 +1,52 @@
-# VividDown
+ï»¿# VividDown
 
-Ò»¿î»ùÓÚ **Tauri**¡¢**Rust** ºÍ **Svelte** ¹¹½¨µÄ¹¦ÄÜÇ¿´ó¡¢ÏÖ´úÇÒÒ×ÓÚÊ¹ÓÃµÄÊÓÆµÏÂÔØÆ÷¡£ËüÖÂÁ¦ÓÚÎªÏÂÔØÊÓÆµ¡¢²¥·ÅÁÐ±íºÍ Shorts ¶ÌÊÓÆµÌá¹©¸ß¼¶ÌåÑé£¬Ö§³ÖÍêÕûµÄÉí·ÝÑéÖ¤Óë¸ßÐÔÄÜ¶àÏß³ÌÏÂÔØ¡£
+ä¸€æ¬¾åŸºäºŽ **Tauri**ã€**Rust** å’Œ **Svelte** æž„å»ºçš„åŠŸèƒ½å¼ºå¤§ã€çŽ°ä»£ä¸”æ˜“äºŽä½¿ç”¨çš„è§†é¢‘ä¸‹è½½å™¨ã€‚è‡´åŠ›äºŽä¸ºä¸‹è½½è§†é¢‘ã€æ’­æ”¾åˆ—è¡¨å’Œ Shorts çŸ­è§†é¢‘æä¾›é«˜çº§ä½“éªŒã€‚
 
-## ? ¹¦ÄÜÌØÐÔ
+> [!IMPORTANT]
+> **å¹³å°æ”¯æŒè¯´æ˜Ž**ï¼šæœ¬è½¯ä»¶ç›®å‰ä»…æ”¯æŒ **Windows** ç³»ç»Ÿã€‚å¯¹ macOS å’Œ Linux çš„æ”¯æŒæ­£åœ¨è§„åˆ’ä¸­ã€‚
 
-- ? **È«ÄÜÖ§³Ö**£ºÖ§³ÖÏÂÔØ±ê×¼ YouTube ÊÓÆµ¡¢Shorts ¶ÌÊÓÆµÒÔ¼°ÍêÕûµÄ²¥·ÅÁÐ±í¡£
-- ? **¸ßÐÔÄÜ¼ÓËÙ**£º¼¯³É **aria2** ÊµÏÖ¶àÏß³ÌÏÂÔØ£¬¼«´óÌáÉý´ø¿íÀûÓÃÂÊ¡£
-- ? **Éí·ÝÑéÖ¤Ö§³Ö**£ºÖ§³ÖÍ¨¹ý¼¯³ÉµÄä¯ÀÀÆ÷µÇÂ¼»òµ¼Èë Cookie£¨Netscape ¸ñÊ½£©£¬ÇáËÉÏÂÔØÊÜÏÞ»òË½ÓÐÄÚÈÝ¡£
-- ?? **Cookie ÖÇÄÜÑéÖ¤**£ºÄÚÖÃ Cookie Ð£Ñé»úÖÆ£¬È·±£µ¼ÈëµÄ YouTube Éí·ÝÑéÖ¤ÁîÅÆÓÐÐ§ÇÒÎ´¹ýÆÚ¡£
-- ? **¶ÓÁÐ¹ÜÀí**£ºÊµÊ±¸ú×ÙÏÂÔØ½ø¶È£¬Ö§³ÖÔÝÍ£¡¢»Ö¸´»òÈ¡ÏûÈÎÎñ¡£
-- ? **ÏÖ´ú UI**£º»ùÓÚ Svelte 5 ¹¹½¨µÄ¼«¼ò½»»¥½çÃæ£¬Ö§³ÖÉîÉ«Ä£Ê½¡¢²£Á§ÄâÌ¬¼°Á÷³©µÄÎ¢¶¯»­¡£
-- ?? **ÖÇÄÜÉèÖÃ**£ºÖ§³Ö×Ô¶¨Òå²¢·¢ÏÂÔØÏÞ¶î¡¢Ä¬ÈÏ·Ö±æÂÊ£¬²¢¿ÉÔÚÓ¦ÓÃÄÚÖ±½Ó¹ÜÀíÍâ²¿¹¤¾ß£¨yt-dlp, FFmpeg, aria2£©¡£
-- ? **¿ìËÙ·ÃÎÊ**£ºÖ§³ÖÒ»¼ü´ò¿ªÏÂÔØÎÄ¼þ¼Ð»ò¸´ÖÆÊÓÆµÁ´½Ó¡£
+## åŠŸèƒ½ç‰¹æ€§
 
-## ?? ¼¼ÊõÕ»
+- **å…¨èƒ½æ”¯æŒ**ï¼šæ”¯æŒä¸‹è½½æ ‡å‡† YouTube è§†é¢‘ã€Shorts çŸ­è§†é¢‘ä»¥åŠå®Œæ•´çš„æ’­æ”¾åˆ—è¡¨ã€‚
+- **é«˜æ€§èƒ½åŠ é€Ÿ**ï¼šé›†æˆ aria2 å®žçŽ°å¤šçº¿ç¨‹å¹¶è¡Œä¸‹è½½ï¼Œæžå¤§æå‡å¸¦å®½åˆ©ç”¨çŽ‡ã€‚
+- **è®¤è¯ç™»å½•**ï¼šæ”¯æŒé€šè¿‡é›†æˆçš„æµè§ˆå™¨ç™»å½•æˆ–å¯¼å…¥ Cookieï¼ˆNetscape æ ¼å¼ï¼‰ï¼Œè½»æ¾ä¸‹è½½å—é™æˆ–ç§æœ‰å†…å®¹ã€‚
+- **å®‰å…¨æ ¡éªŒ**ï¼šå†…ç½® Cookie æ™ºèƒ½éªŒè¯ï¼Œç¡®ä¿è´¦å·å®‰å…¨ä¸”ä»¤ç‰Œæœ‰æ•ˆã€‚
+- **é˜Ÿåˆ—ç®¡ç†**ï¼šå®žæ—¶è·Ÿè¸ªä¸‹è½½è¿›åº¦ï¼Œæ”¯æŒæš‚åœã€æ¢å¤æˆ–å–æ¶ˆä»»åŠ¡ã€‚
+- **çŽ°ä»£ UI**ï¼šåŸºäºŽ Svelte 5 æž„å»ºçš„å“åº”å¼ç•Œé¢ï¼Œæ”¯æŒæ·±è‰²æ¨¡å¼ä¸Žå¾®åŠ¨ç”»ã€‚
+- **æ™ºèƒ½è®¾ç½®**ï¼šå¯è‡ªå®šä¹‰å¹¶å‘é™é¢ã€é»˜è®¤åˆ†è¾¨çŽ‡åŠç®¡ç†å¤–éƒ¨å·¥å…·è·¯å¾„ã€‚
 
-- **Ç°¶Ë**: [Svelte 5](https://svelte.dev/) + [Vite](https://vitejs.dev/)
-- **ºó¶Ë**: [Rust](https://www.rust-lang.org/) + [Tauri 2](https://tauri.app/)
-- **ÏÂÔØºËÐÄ**: [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- **¼ÓËÙÒýÇæ**: [aria2](https://aria2.github.io/)
-- **Ã½Ìå´¦Àí**: [FFmpeg](https://ffmpeg.org/)
+## æŠ€æœ¯æ ˆ
 
-## ? ¿ìËÙÉÏÊÖ
+- å‰ç«¯: Svelte 5 + Vite
+- åŽç«¯: Rust + Tauri 2
+- ä¸‹è½½å¼•æ“Ž: yt-dlp + aria2
+- å¤šåª’ä½“å¤„ç†: FFmpeg
 
-### »·¾³×¼±¸
+## å¿«é€Ÿä¸Šæ‰‹
 
-- [Rust](https://www.rust-lang.org/tools/install) (×îÐÂÎÈ¶¨°æ)
-- [Node.js](https://nodejs.org/) (v18+)
-- [Tauri ÒÀÀµ»·¾³](https://tauri.app/v2/guides/getting-started/prerequisites/)
+### çŽ¯å¢ƒå‡†å¤‡ (ä»…é™ Windows)
 
-### °²×°Óë¿ª·¢
+- Rust (æœ€æ–°ç¨³å®šç‰ˆ)
+- Node.js (v18+)
+- Tauri 2 ä¾èµ–
 
-1. **¿ËÂ¡²Ö¿â**:
-   ```bash
+### å®‰è£…ä¸Žè¿è¡Œ
+
+1. å…‹éš†ä»“åº“:
    git clone https://github.com/yourusername/vivid-down.git
    cd vivid-down
-   ```
 
-2. **°²×°ÒÀÀµ**:
-   ```bash
+2. å®‰è£…ä¾èµ–:
    npm install
-   ```
 
-3. **ÔËÐÐ¿ª·¢Ä£Ê½**:
-   ```bash
+3. å¯åŠ¨å¼€å‘çŽ¯å¢ƒ:
    npm run tauri dev
-   ```
 
-### Éú²ú»·¾³¹¹½¨
+## ä½¿ç”¨æŒ‡å—
 
-```bash
-npm run tauri build
-```
+1. ç²˜è´´é“¾æŽ¥: å¤åˆ¶è§†é¢‘/æ’­æ”¾åˆ—è¡¨é“¾æŽ¥åˆ°è¾“å…¥æ¡†ã€‚
+2. å¼€å§‹ä¸‹è½½: ç‚¹å‡»ä¸‹è½½å›¾æ ‡æˆ–æŒ‰ Ctrl + Enterã€‚
 
-## ? Ê¹ÓÃÖ¸ÄÏ
+## è®¸å¯åè®®
 
-1. **Õ³ÌùÁ´½Ó**: ¸´ÖÆÊÓÆµ URL£¨ÊÓÆµ¡¢²¥·ÅÁÐ±í»ò Shorts£©²¢Õ³Ìùµ½ÊäÈë¿òÖÐ¡£
-2. **Ñ¡Ôñ»­ÖÊ**: Ñ¡ÔñÄúÆ«ºÃµÄ·Ö±æÂÊ»ò¡°½öÏÂÔØÒôÆµ¡±¡£
-3. **¿ªÊ¼ÏÂÔØ**: µã»÷ÏÂÔØ°´Å¥»ò°´ÏÂ `Ctrl + Enter`¡£
-4. **µÇÂ¼£¨¿ÉÑ¡£©**: ÈçÐèÏÂÔØÊÜÏÞÄÚÈÝ£¬¿ÉÍ¨¹ý¡°ÉèÖÃ¡±Ãæ°åµ¼Èë `cookies.txt` ÎÄ¼þ»òÍ¨¹ýÄÚÖÃä¯ÀÀÆ÷µÇÂ¼¡£
-
-## ? ²ÎÓë¹±Ï×
-
-»¶Ó­ÈÎºÎÐÎÊ½µÄ¹±Ï×£¡ÇëËæÊ±Ìá½» Pull Request¡£
-
-## ? Ðí¿ÉÐ­Òé
-
-±¾ÏîÄ¿²ÉÓÃ MIT Ðí¿ÉÐ­Òé¡£ÏêÇéÇë²ÎÔÄ `LICENSE` ÎÄ¼þ¡£
+æœ¬é¡¹ç›®é‡‡ç”¨ MIT è®¸å¯åè®®ã€‚
