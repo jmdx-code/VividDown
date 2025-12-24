@@ -1,14 +1,15 @@
-use crate::models::{DownloadProgressEvent, DownloadStatus, DownloadTask, FormatInfo, VideoInfo};
+use crate::models::{DownloadProgressEvent, DownloadStatus, DownloadTask, VideoInfo};
 use crate::ytdlp::YtDlpManager;
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::Semaphore;
+use tokio::sync::Notify;
 use uuid::Uuid;
 
 #[cfg(target_os = "windows")]
@@ -27,9 +28,12 @@ pub struct DownloadManager {
     ytdlp: Arc<YtDlpManager>,
     ffmpeg: Arc<FFmpegManager>,
     aria2: Arc<Aria2Manager>,
-    semaphore: Arc<Semaphore>,
-    max_concurrent: RwLock<u32>,
-    app_data_dir: PathBuf,
+    /// Current number of active downloads
+    active_downloads: Arc<AtomicU32>,
+    /// Maximum concurrent downloads (dynamically adjustable)
+    max_concurrent: Arc<RwLock<u32>>,
+    /// Notifier for waking up waiting tasks
+    notify: Arc<Notify>,
 }
 
 impl DownloadManager {
@@ -38,7 +42,6 @@ impl DownloadManager {
         ffmpeg: Arc<FFmpegManager>,
         aria2: Arc<Aria2Manager>,
         max_concurrent: u32,
-        app_data_dir: PathBuf,
     ) -> Self {
         Self {
             tasks: Arc::new(RwLock::new(HashMap::new())),
@@ -46,66 +49,17 @@ impl DownloadManager {
             ytdlp,
             ffmpeg,
             aria2,
-            semaphore: Arc::new(Semaphore::new(max_concurrent as usize)),
-            max_concurrent: RwLock::new(max_concurrent),
-            app_data_dir,
+            active_downloads: Arc::new(AtomicU32::new(0)),
+            max_concurrent: Arc::new(RwLock::new(max_concurrent)),
+            notify: Arc::new(Notify::new()),
         }
     }
 
+    /// Update max concurrent downloads - takes effect immediately
     pub fn set_max_concurrent(&self, max: u32) {
         *self.max_concurrent.write().unwrap() = max;
-    }
-
-    fn parse_video_info(&self, json: &serde_json::Value) -> Result<VideoInfo, String> {
-        let id = json["id"].as_str().unwrap_or("unknown").to_string();
-        let title = json["title"]
-            .as_str()
-            .unwrap_or("Unknown Title")
-            .to_string();
-
-        let url = json["webpage_url"]
-            .as_str()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", id));
-
-        let duration = json["duration"].as_u64();
-        let duration_string = json["duration_string"].as_str().map(|s| s.to_string());
-        let thumbnail = json["thumbnail"].as_str().map(|s| s.to_string());
-        let uploader = json["uploader"].as_str().map(|s| s.to_string());
-        let view_count = json["view_count"].as_u64();
-        let playlist_index = json["playlist_index"].as_u64().map(|v| v as u32);
-        let playlist_count = json["playlist_count"].as_u64().map(|v| v as u32);
-
-        let mut formats = Vec::new();
-        if let Some(format_array) = json["formats"].as_array() {
-            for f in format_array {
-                let format_info = FormatInfo {
-                    format_id: f["format_id"].as_str().unwrap_or("").to_string(),
-                    format_note: f["format_note"].as_str().map(|s| s.to_string()),
-                    ext: f["ext"].as_str().unwrap_or("mp4").to_string(),
-                    resolution: f["resolution"].as_str().map(|s| s.to_string()),
-                    filesize: f["filesize"].as_u64(),
-                    filesize_approx: f["filesize_approx"].as_u64(),
-                    vcodec: f["vcodec"].as_str().map(|s| s.to_string()),
-                    acodec: f["acodec"].as_str().map(|s| s.to_string()),
-                };
-                formats.push(format_info);
-            }
-        }
-
-        Ok(VideoInfo {
-            id,
-            url,
-            title,
-            duration,
-            duration_string,
-            thumbnail,
-            uploader,
-            view_count,
-            formats,
-            playlist_index,
-            playlist_count,
-        })
+        // Wake up waiting tasks to check new limit
+        self.notify.notify_waiters();
     }
 
     pub fn create_task(&self, url: String, resolution: String) -> DownloadTask {
@@ -292,18 +246,42 @@ impl DownloadManager {
 
         let tasks = self.tasks.clone();
         let process_ids = self.process_ids.clone();
-        let semaphore = self.semaphore.clone();
+        let active_downloads = self.active_downloads.clone();
+        let max_concurrent = self.max_concurrent.clone();
+        let notify = self.notify.clone();
         let ffmpeg = self.ffmpeg.clone();
         let aria2 = self.aria2.clone();
         let use_cookies = cookies_path.exists();
         let cookies_path_str = cookies_path.to_string_lossy().to_string();
 
         thread::spawn(move || {
-            // Wait for permit (concurrency control)
-            let _permit = tokio::runtime::Runtime::new()
-                .unwrap()
-                .block_on(semaphore.acquire())
-                .unwrap();
+            // Wait for available slot (dynamic concurrency control)
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                loop {
+                    let current = active_downloads.load(Ordering::SeqCst);
+                    let max = *max_concurrent.read().unwrap();
+
+                    if current < max {
+                        // Try to acquire slot
+                        if active_downloads
+                            .compare_exchange(
+                                current,
+                                current + 1,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            )
+                            .is_ok()
+                        {
+                            break;
+                        }
+                        // CAS failed, retry
+                        continue;
+                    }
+                    // No slot available, wait for notification
+                    notify.notified().await;
+                }
+            });
 
             // Update status to Downloading (no separate Fetching phase now)
             if let Some(t) = tasks.write().unwrap().get_mut(&task_id) {
@@ -655,6 +633,9 @@ impl DownloadManager {
                     {
                         // Clean up info.json on pause/cancel
                         let _ = std::fs::remove_file(&info_json_path);
+                        // Release slot before returning
+                        active_downloads.fetch_sub(1, Ordering::SeqCst);
+                        notify.notify_waiters();
                         return;
                     }
 
@@ -667,6 +648,10 @@ impl DownloadManager {
 
             // Clean up the .info.json file after download completes
             let _ = std::fs::remove_file(&info_json_path);
+
+            // Release download slot and notify waiting tasks
+            active_downloads.fetch_sub(1, Ordering::SeqCst);
+            notify.notify_waiters();
         });
     }
 }

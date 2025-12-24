@@ -1,7 +1,19 @@
 <script>
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { convertFileSrc } from "@tauri-apps/api/core";
 
   let { loginStatus, onLogin, onLogout, onToggleSettings } = $props();
+
+  // Convert local file path to WebView-accessible URL
+  let avatarSrc = $derived(() => {
+    const url = loginStatus.avatar_url;
+    if (!url) return null;
+    // If it's a local path (not http), convert it
+    if (!url.startsWith("http")) {
+      return convertFileSrc(url);
+    }
+    return url;
+  });
 
   async function minimizeWindow() {
     try {
@@ -28,7 +40,7 @@
 
 <header>
   <div class="title drag-region">
-    <!-- VividDown Optimized SVG Logo -->
+    <!-- VividDown SVG Logo -->
     <svg
       width="24"
       height="24"
@@ -46,21 +58,18 @@
           <stop offset="100%" style="stop-color:#0072ff" />
         </linearGradient>
       </defs>
-      <!-- Red Ribbon half -->
       <path
         d="M12 2C6.48 2 2 6.48 2 12C2 13.59 2.37 15.09 3.03 16.42"
         stroke="url(#redGradient)"
         stroke-width="2.5"
         stroke-linecap="round"
       />
-      <!-- Blue Ribbon half -->
       <path
         d="M12 22C17.52 22 22 17.52 22 12C22 10.41 21.63 8.91 20.97 7.58"
         stroke="url(#blueGradient)"
         stroke-width="2.5"
         stroke-linecap="round"
       />
-      <!-- Central Down Arrow -->
       <path
         d="M12 7V17M12 17L8 13M12 17L16 13"
         stroke="currentColor"
@@ -72,14 +81,13 @@
     <span>VividDown</span>
   </div>
 
-  <!-- Spacer for drag region -->
   <div class="spacer drag-region"></div>
 
   <div class="actions">
     {#if loginStatus.logged_in}
       <button class="avatar-btn" onclick={handleAvatarClick} title="Account">
-        {#if loginStatus.avatar_url}
-          <img src={loginStatus.avatar_url} alt="Avatar" class="avatar-img" />
+        {#if avatarSrc()}
+          <img src={avatarSrc()} alt="Avatar" class="avatar-img" />
         {:else}
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path

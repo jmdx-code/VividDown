@@ -1,41 +1,54 @@
 <script>
-  import QueueItem from './QueueItem.svelte';
-  
-  let { tasks, onRemove, onClearCompleted } = $props();
-  
-  $effect(() => {
-    console.log('Tasks updated:', tasks);
-  });
-  
-  const completedCount = $derived(
-    tasks.filter(t => t.status === 'completed' || t.status === 'failed').length
-  );
+  import QueueItem from "./QueueItem.svelte";
+
+  let {
+    tasks,
+    onPause,
+    onResume,
+    onCancel,
+    onRetry,
+    onRemove,
+    onClearCompleted,
+  } = $props();
+
+  let hasCompleted = $derived(tasks.some((t) => t.status === "completed"));
 </script>
 
 <div class="queue">
   <div class="queue-header">
-    <span class="queue-title">
-      Download Queue ({tasks.length})
-    </span>
-    {#if completedCount > 0}
+    <span class="queue-title">Downloads ({tasks.length})</span>
+    {#if hasCompleted}
       <button class="clear-btn" onclick={onClearCompleted}>
         Clear Completed
       </button>
     {/if}
   </div>
-  
+
   <div class="queue-list">
     {#if tasks.length === 0}
       <div class="empty">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
-          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          opacity="0.3"
+        >
+          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
         </svg>
         <p>No downloads yet</p>
         <p class="hint">Paste a YouTube URL above to get started</p>
       </div>
     {:else}
       {#each tasks as task (task.id)}
-        <QueueItem {task} onRemove={() => onRemove(task.id)} />
+        <QueueItem
+          {task}
+          onPause={() => onPause(task.id)}
+          onResume={() => onResume(task.id)}
+          onCancel={() => onCancel(task.id)}
+          onRetry={() => onRetry(task.id)}
+          onRemove={() => onRemove(task.id)}
+        />
       {/each}
     {/if}
   </div>
@@ -56,7 +69,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
   }
 

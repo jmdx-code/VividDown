@@ -23,8 +23,29 @@
     let title = $derived(videoInfo?.title || task.url);
     let uploader = $derived(videoInfo?.uploader || null);
     let duration = $derived(videoInfo?.duration_string || null);
+    let viewCount = $derived(videoInfo?.view_count || null);
     let canPause = $derived(task.status === "downloading");
     let canResume = $derived(task.status === "paused");
+
+    // Format view count (e.g., 1234567 -> "1.2M")
+    function formatViewCount(count) {
+        if (!count) return null;
+        if (count >= 1000000) return (count / 1000000).toFixed(1) + "M";
+        if (count >= 1000) return (count / 1000).toFixed(1) + "K";
+        return count.toString();
+    }
+
+    // Format file size (e.g., 123456789 -> "117.7 MB")
+    function formatFileSize(bytes) {
+        if (!bytes) return null;
+        if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + " GB";
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+        if (bytes >= 1024) return (bytes / 1024).toFixed(1) + " KB";
+        return bytes + " B";
+    }
+
+    let formattedViews = $derived(formatViewCount(viewCount));
+    let formattedSize = $derived(formatFileSize(task.total_bytes));
 
     let showTooltip = $state(false);
     let tooltipX = $state(0);
@@ -74,6 +95,7 @@
 </script>
 
 <div class="queue-item">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
         class="thumbnail"
         onmouseenter={handleMouseEnter}
@@ -102,6 +124,7 @@
 
     <div class="info">
         <div class="row1">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <span
                 class="title"
                 {title}
@@ -118,6 +141,12 @@
             <span class="resolution">{task.resolution}</span>
             <span class="separator">|</span>
             <span class="status {status.class}">{status.label}</span>
+            {#if formattedViews}
+                <span class="badge views">{formattedViews} views</span>
+            {/if}
+            {#if formattedSize}
+                <span class="badge size">{formattedSize}</span>
+            {/if}
         </div>
 
         <div class="row3">
@@ -367,6 +396,23 @@
     .status.cancelled {
         color: var(--error);
         background: rgba(231, 76, 60, 0.15);
+    }
+
+    .badge {
+        font-size: 9px;
+        padding: 2px 5px;
+        border-radius: 3px;
+        margin-left: 4px;
+    }
+
+    .badge.views {
+        color: #9b59b6;
+        background: rgba(155, 89, 182, 0.2);
+    }
+
+    .badge.size {
+        color: #3498db;
+        background: rgba(52, 152, 219, 0.2);
     }
 
     .status.paused {

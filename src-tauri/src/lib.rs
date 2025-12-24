@@ -12,11 +12,11 @@ use auth::AuthManager;
 use cookies::convert_cookies_to_netscape;
 use download::DownloadManager;
 use ffmpeg::{FFmpegManager, FFmpegStatus};
-use models::{AppSettings, DownloadTask, LoginStatus, YtDlpStatus};
+use models::{AppSettings, CookiesValidationResult, DownloadTask, LoginStatus, YtDlpStatus};
 use settings::SettingsManager;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State, Url, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, Url, WebviewWindow};
 
 pub struct AppState {
     pub settings: SettingsManager,
@@ -36,6 +36,10 @@ fn get_settings(state: State<AppState>) -> AppSettings {
 
 #[tauri::command]
 fn save_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+    // Update download manager's concurrent limit in real-time
+    state
+        .download
+        .set_max_concurrent(settings.default_concurrent);
     state.settings.save(settings)
 }
 
@@ -185,7 +189,25 @@ fn open_download_folder(state: State<AppState>) -> Result<(), String> {
 
 #[tauri::command]
 fn get_login_status(state: State<AppState>) -> LoginStatus {
-    state.auth.get_status()
+    let mut status = state.auth.get_status();
+    let settings = state.settings.get();
+
+    // Prioritize settings avatar_url (remote URL) over local cache
+    if settings.avatar_url.is_some() {
+        status.avatar_url = settings.avatar_url.clone();
+    }
+
+    // If we have a saved avatar but logged_in is false, check if cookies exist
+    if !status.logged_in && settings.avatar_url.is_some() {
+        let cookies_path = cookies::get_cookies_file_path(&state.settings.get_app_data_dir());
+        if cookies_path.exists() {
+            // Cookies exist, user is still logged in
+            status.logged_in = true;
+            status.cookies_valid = true;
+        }
+    }
+
+    status
 }
 
 #[tauri::command]
@@ -212,6 +234,18 @@ async fn export_cookies(
         return Err("No cookies found. Please login first.".to_string());
     }
 
+    // Check for required auth cookies before saving
+    let required_cookies = ["SID", "SSID", "HSID", "APISID", "SAPISID"];
+    let cookie_names: Vec<&str> = cookies.iter().map(|c| c.name()).collect();
+
+    let has_auth_cookies = required_cookies
+        .iter()
+        .any(|&req| cookie_names.contains(&req));
+
+    if !has_auth_cookies {
+        return Err("Not logged in. No authentication cookies found.".to_string());
+    }
+
     let netscape_content = convert_cookies_to_netscape(&cookies);
     let cookies_path = cookies::get_cookies_file_path(&state.settings.get_app_data_dir());
 
@@ -221,7 +255,10 @@ async fn export_cookies(
     // Update auth status
     state.auth.set_logged_in(true);
 
-    Ok(format!("Exported {} cookies", cookies.len()))
+    Ok(format!(
+        "Exported {} cookies with authentication",
+        cookies.len()
+    ))
 }
 
 #[tauri::command]
@@ -247,8 +284,19 @@ fn logout(state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_avatar(state: State<AppState>, avatar_url: Option<String>) {
-    state.auth.set_avatar(avatar_url);
+fn save_avatar(app_handle: AppHandle, state: State<AppState>, avatar_url: Option<String>) {
+    state.auth.set_avatar(avatar_url.clone());
+
+    // Save avatar URL to settings for persistence across restarts
+    if let Some(ref url) = avatar_url {
+        let mut settings = state.settings.get();
+        settings.avatar_url = Some(url.clone());
+        let _ = state.settings.save(settings);
+    }
+
+    // Emit event to update frontend
+    let status = state.auth.get_status();
+    let _ = app_handle.emit("login_status_updated", status);
 }
 
 #[tauri::command]
@@ -324,6 +372,128 @@ fn check_cookies_valid(state: State<AppState>) -> String {
     }
 }
 
+/// Validate cookies file and cleanup if invalid
+/// Checks: file exists, contains required auth cookies, not expired
+/// Automatically deletes invalid cookies files
+#[tauri::command]
+fn validate_and_cleanup_cookies(state: State<AppState>) -> CookiesValidationResult {
+    let cookies_path = cookies::get_cookies_file_path(&state.settings.get_app_data_dir());
+
+    // Check if file exists
+    if !cookies_path.exists() {
+        return CookiesValidationResult {
+            status: "missing".to_string(),
+            deleted: false,
+            message: "No cookies file found. Downloading in anonymous mode.".to_string(),
+        };
+    }
+
+    // Check for required auth cookies using validate_youtube_cookies
+    if let Err(error_msg) = cookies::validate_youtube_cookies(&cookies_path) {
+        // Delete invalid cookies file
+        let deleted = std::fs::remove_file(&cookies_path).is_ok();
+
+        // Update login status
+        if deleted {
+            state.auth.set_logged_in(false);
+        }
+
+        return CookiesValidationResult {
+            status: "incomplete".to_string(),
+            deleted,
+            message: format!("Cookies invalid: {}. File deleted.", error_msg),
+        };
+    }
+
+    // Check expiry
+    match cookies::check_cookies_expiry(&cookies_path) {
+        Ok(true) => CookiesValidationResult {
+            status: "valid".to_string(),
+            deleted: false,
+            message: "Using logged-in cookies for download.".to_string(),
+        },
+        Ok(false) => {
+            // Delete expired cookies
+            let deleted = std::fs::remove_file(&cookies_path).is_ok();
+
+            if deleted {
+                state.auth.set_logged_in(false);
+            }
+
+            CookiesValidationResult {
+                status: "expired".to_string(),
+                deleted,
+                message: "Cookies expired. File deleted. Please log in again.".to_string(),
+            }
+        }
+        Err(_) => {
+            // Delete corrupted file
+            let deleted = std::fs::remove_file(&cookies_path).is_ok();
+
+            if deleted {
+                state.auth.set_logged_in(false);
+            }
+
+            CookiesValidationResult {
+                status: "error".to_string(),
+                deleted,
+                message: "Cookies file corrupted. File deleted.".to_string(),
+            }
+        }
+    }
+}
+
+/// Clear all user data and reset to defaults
+#[tauri::command]
+fn clear_all_data(state: State<AppState>, app_handle: AppHandle) -> Result<String, String> {
+    use std::fs;
+    use tauri::Manager;
+
+    // Get both Roaming (%APPDATA%) and Local (%LOCALAPPDATA%) directories
+    let app_data_dir = state.settings.get_app_data_dir(); // Roaming
+    let app_local_data_dir = app_handle
+        .path()
+        .app_local_data_dir()
+        .unwrap_or_else(|_| app_data_dir.clone()); // Local
+
+    // Clear in-memory state first
+    state.auth.set_logged_in(false);
+
+    // Delete entire Roaming directory contents
+    if app_data_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&app_data_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let _ = fs::remove_dir_all(&path);
+                } else {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
+    }
+
+    // Delete entire Local directory contents
+    if app_local_data_dir.exists() && app_local_data_dir != app_data_dir {
+        if let Ok(entries) = fs::read_dir(&app_local_data_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let _ = fs::remove_dir_all(&path);
+                } else {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
+    }
+
+    Ok(format!(
+        "Cleared: {} and {}",
+        app_data_dir.display(),
+        app_local_data_dir.display()
+    ))
+}
+
 // ==================== Entry Point ====================
 
 use ytdlp::YtDlpManager;
@@ -352,7 +522,6 @@ pub fn run() {
                 ffmpeg.clone(),
                 aria2.clone(),
                 default_concurrent,
-                app_data_dir,
             );
 
             app.manage(AppState {
@@ -401,6 +570,8 @@ pub fn run() {
             check_cookies_exist,
             validate_cookies_async,
             check_cookies_valid,
+            validate_and_cleanup_cookies,
+            clear_all_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

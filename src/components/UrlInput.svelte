@@ -1,7 +1,21 @@
 <script>
-  let { defaultResolution, onDownload, disabled } = $props();
+  let {
+    defaultResolution,
+    onDownload,
+    onResolutionChange,
+    ytdlpInstalled = true,
+    ffmpegInstalled = true,
+  } = $props();
+
   let urlText = $state("");
-  let resolution = $state(defaultResolution);
+  let resolution = $state("1080p");
+
+  // Sync resolution with prop when it changes
+  $effect(() => {
+    if (defaultResolution) {
+      resolution = defaultResolution;
+    }
+  });
 
   const resolutions = [
     "best",
@@ -10,9 +24,20 @@
     "1080p",
     "720p",
     "480p",
-    "360p",
     "audio",
   ];
+
+  // Check if all required tools are installed
+  let toolsReady = $derived(ytdlpInstalled && ffmpegInstalled);
+
+  // Calculate disabled reason for tooltip
+  function getDisabledReason() {
+    if (!ytdlpInstalled && !ffmpegInstalled)
+      return "Please install yt-dlp and FFmpeg first";
+    if (!ytdlpInstalled) return "Please install yt-dlp first";
+    if (!ffmpegInstalled) return "Please install FFmpeg first";
+    return "";
+  }
 
   // Valid YouTube URL patterns (video, shorts, playlist only - no channels/homepage)
   const validPatterns = [
@@ -42,8 +67,17 @@
   let isValid = $derived(validationState() === "valid");
   let showError = $derived(validationState() === "invalid");
 
+  // Button is disabled if tools not ready OR no valid URL
+  let buttonDisabled = $derived(!toolsReady || !urlText.trim() || !isValid);
+  let buttonTitle = $derived(() => {
+    if (!toolsReady) return getDisabledReason();
+    if (!urlText.trim()) return "Enter a URL to download";
+    if (!isValid) return "Invalid URL format";
+    return "Start download";
+  });
+
   function handleSubmit() {
-    if (!urlText.trim() || disabled || !isValid) return;
+    if (buttonDisabled) return;
     const urls = urlText
       .split("\n")
       .map((u) => u.trim())
@@ -59,6 +93,14 @@
       handleSubmit();
     }
   }
+
+  function handleResolutionChange(e) {
+    resolution = e.target.value;
+    // Save to settings
+    if (onResolutionChange) {
+      onResolutionChange(resolution);
+    }
+  }
 </script>
 
 <div class="url-input">
@@ -69,15 +111,16 @@
       onkeydown={handleKeydown}
       class:valid={isValid && urlText.trim()}
       class:invalid={showError}
-      {disabled}
     ></textarea>
     {#if showError}
-      <div class="error-hint">请输入有效的 YouTube 视频/播放列表链接</div>
+      <div class="error-hint">
+        Please enter a valid YouTube video/playlist URL
+      </div>
     {/if}
   </div>
 
   <div class="controls">
-    <select bind:value={resolution} {disabled}>
+    <select value={resolution} onchange={handleResolutionChange}>
       {#each resolutions as res}
         <option value={res}>{res === "audio" ? "Audio Only" : res}</option>
       {/each}
@@ -86,7 +129,8 @@
     <button
       class="download-btn"
       onclick={handleSubmit}
-      disabled={disabled || !urlText.trim() || !isValid}
+      disabled={buttonDisabled}
+      title={buttonTitle()}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />

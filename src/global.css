@@ -7,10 +7,9 @@
     --accent: #ff0000;
     --accent-hover: #cc0000;
     --success: #2ecc71;
-    --error: #e74c3c;
     --warning: #f39c12;
-    --border: #3a3a3a;
-    --shadow: rgba(0, 0, 0, 0.3);
+    --error: #e74c3c;
+    --border: rgba(255, 255, 255, 0.1);
 }
 
 * {
@@ -27,8 +26,6 @@ body {
     color: var(--text-primary);
     height: 100%;
     overflow: hidden;
-    user-select: none;
-    -webkit-user-select: none;
 }
 
 #app {

@@ -25,6 +25,9 @@ pub struct AppSettings {
     /// Browser profile folder name (e.g. "Profile 1", "Default")
     #[serde(default)]
     pub cookies_profile: String,
+    /// User avatar URL (persisted across restarts)
+    #[serde(default)]
+    pub avatar_url: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -42,6 +45,7 @@ impl Default for AppSettings {
             auth_method: "browser".to_string(),
             cookies_browser: "chrome".to_string(),
             cookies_profile: "Default".to_string(),
+            avatar_url: None,
         }
     }
 }
@@ -137,13 +141,13 @@ pub struct LoginStatus {
     pub avatar_url: Option<String>,
 }
 
-/// Browser Profile for cookies extraction
+/// Cookies validation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BrowserProfile {
-    /// Internal folder name (e.g. "Profile 1", "Default")
-    pub folder_name: String,
-    /// User-friendly display name (e.g. "Work Account")
-    pub display_name: String,
-    /// Google account email if available
-    pub email: Option<String>,
+pub struct CookiesValidationResult {
+    /// Status: "valid", "missing", "expired", "incomplete"
+    pub status: String,
+    /// Whether the invalid cookies file was deleted
+    pub deleted: bool,
+    /// User-friendly message
+    pub message: String,
 }
